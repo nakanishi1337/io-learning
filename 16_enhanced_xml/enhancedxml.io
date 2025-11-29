@@ -1,29 +1,68 @@
+// 11_domain_specific_languageからマップを移植 /////
+OperatorTable addAssignOperator(":", "atPutNumber")
+
+curlyBrackets := method(
+    r := Map clone
+    call message arguments foreach(arg,
+        r doMessage(arg)
+    )
+    r
+)
+
+Map atPutNumber := method(
+    self atPut(
+        call evalArgAt(0) asMutable removePrefix("\"") removeSuffix("\""),
+        call evalArgAt(1)
+    )
+)
+
+Map printAsAttributes := method(
+    self foreach(k, v,
+        write(" " .. k .. "=\"" .. v .. "\"")
+    )
+)
+// ここまで移植 /////
+
+
+
+// 以下はXMLビルダーの改良版
 Builder := Object clone
-Builder indentLevel := 0          // ネストの深さを記録
+Builder indentLevel := 0   // ネストの深さを記録
 Builder indent := method("  " repeated(indentLevel))
 
 Builder forward := method(
-    // <tag> の前にインデントをつける
-    writeln(indent, "<", call message name, ">")
+    // タグ名
+    tag := call message name
 
-    // 中身の処理：ネストを1段深くする
+    // 開始タグ
+    write(indent, "<", tag)
+
+    // --- 属性を処理 ---
+    call message arguments foreach(arg,
+        if(arg name == "curlyBrackets",
+            attrs := self doMessage(arg)
+            attrs printAsAttributes
+        )
+    )
+    writeln(">")
+
+    // --- 中身を処理（ネスト） ---
     self indentLevel = self indentLevel + 1
 
-    call message arguments foreach(
-        arg,
-        content := self doMessage(arg)
-        if(content type == "Sequence",
-            writeln(indent, content)
+    call message arguments foreach(arg,
+        if(arg name != "curlyBrackets",
+            content := self doMessage(arg)
+            if(content type == "Sequence",
+                writeln(indent, content)
+            )
         )
     )
 
-    // 閉じタグを書くのでインデントレベルを戻す
     self indentLevel = self indentLevel - 1
-    writeln(indent, "</", call message name, ">")
+
+    // 閉じタグ
+    writeln(indent, "</", tag, ">")
 )
 
-Builder ul(
-    li("Item 1"),
-    li("Item 2"),
-    li("Item 3")
-)
+s := File with("LispML.txt") openForReading contents
+doString(s)
